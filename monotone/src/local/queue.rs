@@ -43,11 +43,11 @@ impl QueueInner {
         Ok(Ticket::new(process_id, counter, position))
     }
 
-    fn leave_queue(&mut self, ticket: Ticket) -> Result<()> {
-        if let Some(pos) = self.items.iter().position(|t| t.process_id == ticket.process_id) {
+    fn leave_queue(&mut self, process_id: &str) -> Result<()> {
+        if let Some(pos) = self.items.iter().position(|t| t.process_id == process_id) {
             self.items.remove(pos);
         } else {
-            bail!(ErrorKind::NotFound(ticket.process_id));
+            bail!(ErrorKind::NotFound(process_id.to_owned()));
         }
 
         Ok(())
@@ -93,10 +93,10 @@ impl MonotonicQueue for Queue {
         inner.join_queue(process_id)
     }
 
-    fn leave_queue(&self, ticket: Ticket) -> Result<()> {
+    fn leave_queue(&self, process_id: &str) -> Result<()> {
         let mut inner = self.items.lock().unwrap();
 
-        inner.leave_queue(ticket)
+        inner.leave_queue(process_id)
     }
 
     fn get_ticket(&self, process_id: &str) -> Result<Ticket> {

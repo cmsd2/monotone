@@ -39,9 +39,19 @@ error_chain! {
             display("unrecognised counter type")
         }
 
+        UnrecognisedQueueType {
+            description("unrecognised counter type")
+            display("unrecognised counter type")
+        }
+
         MissingAttribute {
             description("missing attribute")
             display("missing attribute")
+        }
+
+        TicketNotFound(process_id: String) {
+            description("ticket not found")
+            display("ticket not found")
         }
     }
 }

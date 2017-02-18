@@ -1,6 +1,7 @@
 pub mod counter;
 pub mod dynamodb;
 pub mod error;
+pub mod queue;
 
 #[derive(Serialize, Deserialize)]
 pub struct AWSError {

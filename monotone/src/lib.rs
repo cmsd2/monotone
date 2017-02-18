@@ -51,7 +51,7 @@ pub trait MonotonicQueue {
 
     fn join_queue(&self, process_id: String) -> result::Result<Ticket, Self::Error>;
 
-    fn leave_queue(&self, ticket: Ticket) -> result::Result<(), Self::Error>;
+    fn leave_queue(&self, process_id: &str) -> result::Result<(), Self::Error>;
 
     fn get_ticket(&self, process_id: &str) -> result::Result<Ticket, Self::Error>;
 

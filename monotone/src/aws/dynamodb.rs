@@ -1,9 +1,8 @@
 use std::thread;
 use std::time::Duration;
 use std::default::Default;
-use std::collections::HashMap;
 use serde_json;
-use rusoto::{DefaultCredentialsProvider, Region, ProvideAwsCredentials, DispatchSignedRequest};
+use rusoto::{ProvideAwsCredentials, DispatchSignedRequest};
 use rusoto::dynamodb::*;
 use super::error::*;
 use super::*;
