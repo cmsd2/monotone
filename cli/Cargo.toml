@@ -1,6 +1,6 @@
 [package]
 name = "monotone-cli"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Chris Dawes <cmsd2@cantab.net>"]
 license = "Apache-2.0"
 description = "Monotonic counter cli implemented on top of AWS DynamoDB."
