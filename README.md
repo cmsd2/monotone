@@ -6,21 +6,37 @@ The implementations are designed with configuration management in mind.
 Note the counters are not performance counters for use in event tracking.
 
 Two implementations are include:
+
 1. a single-process implementation, synchronised by `Arc<Mutex<...>>`
 2. a DynamoDb implementation which uses conditional updates for optimistic locking
 
 ## Building / Installing
 
-### Laptop / Development env
+The source repository contains two projects. The library is called monotone, and the
+cli lives in a folder called cli, although it builds an executable file called monotone.
 
-Install rust. Stable rust is fine, but it should be at least 1.13.
+### Library
+
+You can link to the library by adding it as a dependency to your Cargo.toml as usual.
+Select the `aws` feature to bring in rusoto and use the DynamoDb backend.
+
+The default is just the in-memory backend.
+
+```
+[dependencies]
+monotone = { version = "0.1", features = ["aws"] }
+```
+
+### CLI on Laptop / Development env
+
+Install rust. Stable rust is fine, but it should be at least 1.15.
 
 Consider using rustup: https://www.rustup.rs
 
 Then run `cargo install monotone` to install the version from https://crates.io
 or `cargo install .` to build from checked out source.
 
-### CI / CD
+### CLI on CI / CD
 
 Either install the rust toolchain on your jenkins or use a docker container like this one: https://hub.docker.com/r/jimmycuadra/rust/
 
@@ -37,7 +53,7 @@ The cli will prevent you running counter commands on a queue and visa versa.
 Counter is a simple atomic counter. Run like so:
 
 ```
-monotone_cli -i mycounter counter get
+monotone -i mycounter counter get
 ```
 
 will return
@@ -54,7 +70,7 @@ will return
 Increment the counter like so:
 
 ```
-monotone_cli -i mycounter counter next
+monotone -i mycounter counter next
 ```
 
 will return
@@ -76,7 +92,7 @@ The list is sorted in ascending order of counter value.
 Add a process ID to the queue like so:
 
 ```
-monotone_cli -i myqueue queue -p foo join
+monotone -i myqueue queue -p foo join
 ```
 
 which will output something like this:
@@ -84,37 +100,43 @@ which will output something like this:
 ```
 {
   "id": "myqueue",
-  "process_id": "foo",
-  "counter": 1,
-  "position": 0,
   "region": "eu-west-1",
-  "table": "Counters"
+  "table": "Counters",
+  "ticket": {
+    "process_id": "foo",
+    "counter": 1,
+    "position": 0
+  }
 }
 ```
 
 You can also remove a node (for tidyness) like so:
 
 ```
-monotone_cli -i myqueue queue -p foo leave
+monotone -i myqueue queue -p foo leave
 ```
 
 To list the nodes use:
 
 ```
-monotone_cli -i myqueue queue list
+monotone -i myqueue queue list
 ```
 
 which will output something like this:
 
 ```
-[{
+{
   "id": "myqueue",
-  "process_id": "foo",
-  "counter": 1,
-  "position": 0,
   "region": "eu-west-1",
-  "table": "Counters"
-}]
+  "table": "Counters",
+  "tickets": [
+    {
+      "process_id": "foo",
+      "counter": 1,
+      "position": 0
+    }
+  ]
+}
 ```
 
 ## Example Usecases
@@ -128,23 +150,10 @@ You have to build on something you do have, like DynamoDb.
 On first boot, run the cli's queue command like so (make very sure your hostnames are unique e.g. EC2 instance IDs!):
 
 ```
-monotone_cli -i myzkcluster queue -p $(hostname -f) join
+monotone -i myzkcluster queue -p $(hostname -f) join | jq .ticket.counter
 ```
 
-which will output something like this:
-
-```
-{
-  "id": "myzkcluster",
-  "process_id": "foo",
-  "counter": 1,
-  "position": 0,
-  "region": "eu-west-1",
-  "table": "Counters"
-}
-```
-
-Write the value of the counter field to `/etc/zookeeper/conf/myid` as appropriate.
+Write the resulting value to `/etc/zookeeper/conf/myid` as appropriate.
 
 Note the zookeeper docs say the server ID must be between 0 and 255.
 Monotone uses the full range of u64 integers.

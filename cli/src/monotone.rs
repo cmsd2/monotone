@@ -36,13 +36,26 @@ pub struct CounterValue {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct QueueTicket {
+pub struct QueueTicketListOutput {
     pub id: String,
+    pub region: String,
+    pub table: String,
+    pub tickets: Vec<QueueTicket>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct QueueTicketOutput {
+    pub id: String,
+    pub region: String,
+    pub table: String,
+    pub ticket: QueueTicket,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct QueueTicket {
     pub process_id: String,
     pub counter: u64,
     pub position: usize,
-    pub region: String,
-    pub table: String,
 }
 
 fn main() {
@@ -167,13 +180,15 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let ticket = queue.get_ticket(process_id)?;
 
-            let result = QueueTicket {
+            let result = QueueTicketOutput {
                 id: s(id),
                 region: region.to_string(),
-                process_id: s(ticket.process_id),
-                counter: ticket.counter,
-                position: ticket.position,
                 table: s(table_name),
+                ticket: QueueTicket {
+                    process_id: s(ticket.process_id),
+                    counter: ticket.counter,
+                    position: ticket.position,
+                }
             };
 
             println!("{}", serde_json::to_string_pretty(&result)?);
@@ -186,17 +201,21 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let tickets = queue.get_tickets()?;
 
-            let mut result = vec![];
+            let mut ticket_list = vec![];
             for t in tickets {
-                result.push(QueueTicket {
-                    id: s(id),
+                ticket_list.push(QueueTicket {
                     process_id: s(t.process_id),
-                    region: region.to_string(),
                     counter: t.counter,
                     position: t.position,
-                    table: s(table_name),
                 });
             }
+
+            let result = QueueTicketListOutput {
+                id: s(id),
+                region: region.to_string(),
+                table: s(table_name),
+                tickets: ticket_list,
+            };
 
             println!("{}", serde_json::to_string_pretty(&result)?);
         },
@@ -210,13 +229,15 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let ticket = queue.join_queue(s(process_id))?;
 
-            let result = QueueTicket {
+            let result = QueueTicketOutput {
                 id: s(id),
                 region: region.to_string(),
-                process_id: s(ticket.process_id),
-                counter: ticket.counter,
-                position: ticket.position,
                 table: s(table_name),
+                ticket: QueueTicket {
+                    process_id: s(ticket.process_id),
+                    counter: ticket.counter,
+                    position: ticket.position,
+                }
             };
 
             println!("{}", serde_json::to_string_pretty(&result)?);
