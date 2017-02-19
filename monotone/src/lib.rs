@@ -29,6 +29,8 @@ pub trait MonotonicCounter {
     fn next_value(&self) -> result::Result<u64, Self::Error>;
 }
 
+pub type FencingToken = u64;
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Ticket {
     pub process_id: String,
@@ -49,13 +51,13 @@ impl Ticket {
 pub trait MonotonicQueue {
     type Error;
 
-    fn join_queue(&self, process_id: String) -> result::Result<Ticket, Self::Error>;
+    fn join_queue(&self, process_id: String) -> result::Result<(FencingToken, Ticket), Self::Error>;
 
-    fn leave_queue(&self, process_id: &str) -> result::Result<(), Self::Error>;
+    fn leave_queue(&self, process_id: &str) -> result::Result<FencingToken, Self::Error>;
 
-    fn get_ticket(&self, process_id: &str) -> result::Result<Ticket, Self::Error>;
+    fn get_ticket(&self, process_id: &str) -> result::Result<(FencingToken, Ticket), Self::Error>;
 
-    fn get_tickets(&self) -> result::Result<Vec<Ticket>, Self::Error>;
+    fn get_tickets(&self) -> result::Result<(FencingToken, Vec<Ticket>), Self::Error>;
 }
 
 #[cfg(test)]

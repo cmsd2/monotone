@@ -141,7 +141,7 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
         }
     }
 
-    pub fn write(&self, row: QueueRow) -> Result<()> {
+    pub fn write(&self, row: QueueRow) -> Result<u64> {
         let mut item = HashMap::new();
         item.insert(s("ID"), AttributeValue { s: Some(s(self.id.clone())), ..Default::default() });
         item.insert(s("Version"), AttributeValue { n: Some(format!("{}", row.version + 1)), ..Default::default() });
@@ -179,7 +179,7 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
                 bail!(ErrorKind::PutItem(e));
             },
             Ok(_) => {
-                Ok(())
+                Ok(row.version + 1)
             }
         }
     }
@@ -188,7 +188,7 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
 impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
     type Error = Error;
 
-    fn join_queue(&self, process_id: String) -> Result<Ticket> {
+    fn join_queue(&self, process_id: String) -> Result<(u64, Ticket)> {
         loop {
             let maybe_queue = self.read()?;
 
@@ -197,13 +197,14 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
                 QueueRow::new(self.id.clone())
             });
 
+
             if let Some(ticket) = queue.items
                     .iter()
                     .enumerate()
                     .find(|&(_pos, t)| t.process_id == process_id)
                     .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position)) {
 
-                return Ok(ticket)
+                return Ok((queue.version, ticket))
             }
 
             queue.value += 1;
@@ -222,14 +223,14 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
                 Err(e) => {
                     bail!(e);
                 },
-                Ok(()) => {
-                    return Ok(Ticket::new(process_id, counter, position));
+                Ok(version) => {
+                    return Ok((version, Ticket::new(process_id, counter, position)));
                 }
             }
         }
     }
 
-    fn leave_queue(&self, process_id: &str) -> Result<()> {
+    fn leave_queue(&self, process_id: &str) -> Result<u64> {
         loop {
             if let Some(mut queue) = self.read()? {              
                 if let Some(pos) = queue.items.iter().position(|t| t.process_id == process_id) {
@@ -247,21 +248,21 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
                     Err(e) => {
                         bail!(e);
                     },
-                    Ok(()) => {
-                        return Ok(());
+                    Ok(version) => {
+                        return Ok(version);
                     }
                 }
             }
         }
     }
 
-    fn get_ticket(&self, process_id: &str) -> Result<Ticket> {
+    fn get_ticket(&self, process_id: &str) -> Result<(u64, Ticket)> {
         if let Some(queue) = self.read()? {
             queue.items
                 .iter()
                 .enumerate()
                 .find(|&(_pos, t)| t.process_id == process_id)
-                .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position))
+                .map(|(position,t)| (queue.version, Ticket::new(t.process_id.clone(), t.counter, position)))
                 .ok_or_else(|| ErrorKind::TicketNotFound(process_id.to_owned()).into())
 
         } else {
@@ -269,15 +270,15 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
         }
     }
 
-    fn get_tickets(&self) -> Result<Vec<Ticket>> {
+    fn get_tickets(&self) -> Result<(u64, Vec<Ticket>)> {
         if let Some(queue) = self.read()? {
-            Ok(queue.items
+            Ok((queue.version, queue.items
                 .iter()
                 .enumerate()
                 .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position))
-                .collect())
+                .collect()))
         } else {
-            Ok(vec![])
+            Ok((0, vec![]))
         }
     }
 }

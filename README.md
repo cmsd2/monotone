@@ -89,6 +89,10 @@ will return
 The queue is a list of string process IDs. Each entry in the queue is given the monotonic counter value when it joins the list.
 The list is sorted in ascending order of counter value.
 
+The queue contains a fencing token which is returned by all operations.
+This will monotonically increase with every write to storage.
+Use this for conditional updates in other systems to prevent acting on a stale view of the queue.
+
 Add a process ID to the queue like so:
 
 ```
@@ -102,6 +106,7 @@ which will output something like this:
   "id": "myqueue",
   "region": "eu-west-1",
   "table": "Counters",
+  "fencing_token": 1,
   "ticket": {
     "process_id": "foo",
     "counter": 1,
@@ -114,6 +119,17 @@ You can also remove a node (for tidyness) like so:
 
 ```
 monotone -i myqueue queue -p foo leave
+```
+
+which prints output:
+
+```
+{
+  "id": "myqueue",
+  "region": "eu-west-1",
+  "table": "Counters",
+  "fencing_token": 2
+}
 ```
 
 To list the nodes use:
@@ -129,6 +145,7 @@ which will output something like this:
   "id": "myqueue",
   "region": "eu-west-1",
   "table": "Counters",
+  "fencing_token": 2,
   "tickets": [
     {
       "process_id": "foo",
@@ -157,3 +174,14 @@ Write the resulting value to `/etc/zookeeper/conf/myid` as appropriate.
 
 Note the zookeeper docs say the server ID must be between 0 and 255.
 Monotone uses the full range of u64 integers.
+
+### Simple leader election or lock
+
+The list of nodes in the queue is enough to nominate a distinguished process or leader.
+
+Just use the first process in the queue.
+
+There are several limitations:
+
+1. There's no liveness checking to remove failed processes from the queue
+2. You must use the fencing token to ensure the queue hasn't changed while acting as leader / holding the lock.

@@ -40,7 +40,16 @@ pub struct QueueTicketListOutput {
     pub id: String,
     pub region: String,
     pub table: String,
+    pub fencing_token: u64,
     pub tickets: Vec<QueueTicket>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct QueueTicketEmptyOutput {
+    pub id: String,
+    pub region: String,
+    pub table: String,
+    pub fencing_token: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,6 +57,7 @@ pub struct QueueTicketOutput {
     pub id: String,
     pub region: String,
     pub table: String,
+    pub fencing_token: u64,
     pub ticket: QueueTicket,
 }
 
@@ -178,12 +188,13 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let queue = Queue::new(client, table_name, id, Duration::from_millis(100));
 
-            let ticket = queue.get_ticket(process_id)?;
+            let (version, ticket) = queue.get_ticket(process_id)?;
 
             let result = QueueTicketOutput {
                 id: s(id),
                 region: region.to_string(),
                 table: s(table_name),
+                fencing_token: version,
                 ticket: QueueTicket {
                     process_id: s(ticket.process_id),
                     counter: ticket.counter,
@@ -199,7 +210,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let queue = Queue::new(client, table_name, id, Duration::from_millis(100));
 
-            let tickets = queue.get_tickets()?;
+            let (version, tickets) = queue.get_tickets()?;
 
             let mut ticket_list = vec![];
             for t in tickets {
@@ -214,6 +225,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
                 id: s(id),
                 region: region.to_string(),
                 table: s(table_name),
+                fencing_token: version,
                 tickets: ticket_list,
             };
 
@@ -227,12 +239,13 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let queue = Queue::new(client, table_name, id, Duration::from_millis(100));
 
-            let ticket = queue.join_queue(s(process_id))?;
+            let (version, ticket) = queue.join_queue(s(process_id))?;
 
             let result = QueueTicketOutput {
                 id: s(id),
                 region: region.to_string(),
                 table: s(table_name),
+                fencing_token: version,
                 ticket: QueueTicket {
                     process_id: s(ticket.process_id),
                     counter: ticket.counter,
@@ -250,7 +263,16 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let queue = Queue::new(client, table_name, id, Duration::from_millis(100));
             
-            queue.leave_queue(process_id)?;
+            let version = queue.leave_queue(process_id)?;
+
+            let result = QueueTicketEmptyOutput {
+                id: s(id),
+                region: region.to_string(),
+                table: s(table_name),
+                fencing_token: version
+            };
+
+            println!("{}", serde_json::to_string_pretty(&result)?);
         },
         Some("rm") => {
             unimplemented!()
