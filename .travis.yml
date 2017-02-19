@@ -20,6 +20,13 @@ before_script:
 
 script:
   - |
+      cd monotone &&
+      travis-cargo build &&
+      travis-cargo test &&
+      travis-cargo bench &&
+      travis-cargo --only stable doc
+  - |
+      cd cli &&
       travis-cargo build &&
       travis-cargo test &&
       travis-cargo bench &&
