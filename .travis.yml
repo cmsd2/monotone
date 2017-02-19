@@ -21,10 +21,10 @@ before_script:
 script:
   - |
       cd $TRAVIS_BUILD_DIR/monotone &&
-      travis-cargo build --features=all &&
-      travis-cargo test --features=all &&
-      travis-cargo bench --features=all &&
-      travis-cargo --only stable doc --features=all
+      travis-cargo build -- --features=all &&
+      travis-cargo test -- --features=all &&
+      travis-cargo bench -- --features=all &&
+      travis-cargo --only stable doc -- --features=all
   - |
       cd $TRAVIS_BUILD_DIR/cli &&
       travis-cargo build &&
