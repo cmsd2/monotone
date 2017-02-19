@@ -1,36 +1,34 @@
 sudo: false
 language: rust
-
 addons:
   apt:
     packages:
-      - libcurl4-openssl-dev
-      - libelf-dev
-      - libdw-dev
-      - binutils-dev
-
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
 rust:
-  - beta
-  - stable
-
+- beta
+- stable
 before_script:
-  - |
-      pip install 'travis-cargo<0.2' --user &&
-      export PATH=$HOME/.local/bin:$PATH
-
+- |
+  pip install 'travis-cargo<0.2' --user &&
+  export PATH=$HOME/.local/bin:$PATH
 script:
-  - |
-      cd $TRAVIS_BUILD_DIR/monotone &&
-      travis-cargo build -- --features=all &&
-      travis-cargo test -- --features=all &&
-      travis-cargo bench -- --features=all &&
-      travis-cargo --only stable doc -- --features=all
-  - |
-      cd $TRAVIS_BUILD_DIR/cli &&
-      travis-cargo build &&
-      travis-cargo test &&
-      travis-cargo bench &&
-      travis-cargo --only stable doc
-
+- |
+  cd $TRAVIS_BUILD_DIR/monotone &&
+  travis-cargo build -- --features=all &&
+  travis-cargo test -- --features=all &&
+  travis-cargo bench -- --features=all &&
+  travis-cargo --only stable doc -- --features=all
+- |
+  cd $TRAVIS_BUILD_DIR/cli &&
+  travis-cargo build &&
+  travis-cargo test &&
+  travis-cargo bench &&
+  travis-cargo --only stable doc
 env:
   global:
+    - AWS_ACCESS_KEY_ID: AKIAJITB7MNSSUOYSGJQ
+    - AWS_DEFAULT_REGION: eu-west-1
+    - secure: XdLhsHXDSDf34q1wN7U101qO7RR7rAxSrPI1NMid4rBesPpg8jcKz/DyCSG3YGech301xfwX6xBnySDlwPadCec7Ru05+v692DRMggFkXwN0DAhofZu9S39Lmn2JJ3+lhGsfrPfBFoRgEdrjedI4XTNRRxcTircFi3aMkqUDfHNDPe2OZEuYDM/DLZbq+pmj//IyczGrbQgVP4XE1R/jcMJ5IvbQvxSLIuYycjiuZ5xLWqxSFjDn7RbbxeYYZNqqc3nZA5TxgtwGyvBvxVfZGJGp/Mw8EYKae7WnGE127vn+vn63/fx188Qk64i/pscrzl9WDD6GmY3G5/pse8VJ2xyFvc1mw7hP7Vi2fa67HDdsTr2jWGv3XXMDJfJCTPq8Glq2mPu27mysBNxuttsepoUHXG3uKVGfM+lJBd/NQxkPrubrIAC5LlY/liYNKb0r1lNgWs1KjmyoEHbLU9O2GTR0uN+pbiEhdZp8DBwhrKcMg+RpErPL/wXPv3zs58iOkqGmuFw7T8vfUIlXktGqV73ZSqGVKXzL12Z+FEPMwVd0cvNxCrfVKfTb6PMWVWWHT58NvGolkzL6JrTKhOmnUvgha1Lv5IWmXhTyJ27uvuVIWgwvvC4mkVzMuSZ69eZ5rQ0718FwGH/wcvUmnH/xbR7ZMot45hBSwWNx15nhyBA=

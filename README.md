@@ -40,7 +40,7 @@ Install rust. Stable rust is fine, but it should be at least 1.15.
 Consider using rustup: https://www.rustup.rs
 
 Then run `cargo install monotone` to install the version from https://crates.io
-or `cargo install .` to build from checked out source.
+or `cargo install --path=.` to install directly from checked out source.
 
 ### CLI on CI / CD
 
