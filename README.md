@@ -1,4 +1,6 @@
 # monotone
+[![Build Status](https://travis-ci.org/cmsd2/monotone.svg?branch=master)](https://travis-ci.org/cmsd2/monotone)
+
 Counters and queues for configuration management in distributed systems
 
 Monotone is a library and cli for maintaining atomic counters and queues.
@@ -9,6 +11,10 @@ Two implementations are include:
 
 1. a single-process implementation, synchronised by `Arc<Mutex<...>>`
 2. a DynamoDb implementation which uses conditional updates for optimistic locking
+
+## Documentation
+
+[https://docs.rs/monotone](https://docs.rs/monotone)
 
 ## Building / Installing
 
