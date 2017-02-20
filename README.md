@@ -47,7 +47,12 @@ or `cargo install --path=.` to install directly from checked out source.
 Either install the rust toolchain on your jenkins or use a docker container like this one: https://hub.docker.com/r/jimmycuadra/rust/
 
 Then build as you would in your dev env and copy the built artifact somewhere safe.
- 
+
+## Testing
+
+The `monotone/tests` folder contains integration tests.
+The `terraform` folder contains infrastructure definitions for running the integration tests. See the readme file there.
+
 ## Cli commands
 
 Each counter or queue is stored in its own row in the table in DynamoDb.
