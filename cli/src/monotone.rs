@@ -69,9 +69,11 @@ pub struct QueueTicket {
 }
 
 fn main() {
+    env_logger::init().expect("env_logger::init");
+
     match run() {
         Err(Error(ErrorKind::MissingArgument(s), _)) => {
-            println!("Missing required argument {}\n", s);
+            error!("Missing required argument {}\n", s);
             print_help().expect("help");
             std::process::exit(1);
         },
@@ -82,8 +84,6 @@ fn main() {
 }
 
 pub fn run() -> Result<()> {
-    env_logger::init()?;
-
     let matches = parse_args();
 
     let provider = DefaultCredentialsProvider::new()?;
@@ -102,12 +102,12 @@ pub fn run() -> Result<()> {
             run_queue(region, client, &matches, &sub_matches)?;
         },
         Some(c) => {
-            println!("Unrecognised subcommand: {}\n", c);
+            error!("Unrecognised subcommand: {}\n", c);
             print_help()?;
             std::process::exit(1);
         },
         None => {
-            println!("No subcommand provided\n");
+            error!("No subcommand provided\n");
             print_help()?;
             std::process::exit(1);
         }
@@ -157,15 +157,20 @@ pub fn run_counter<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches:
             println!("{}", serde_json::to_string_pretty(&result)?);
         },
         Some("rm") => {
-            unimplemented!()
+            create_table_if_needed(&client, table_name, 1, 1)?;
+            wait_for_table(&client, table_name)?;
+
+            let counter = Counter::new(client, table_name, id, Duration::from_millis(100));
+
+            counter.remove()?;
         },
         Some(c) => {
-            println!("Unrecognised subcommand: {}\n", c);
+            error!("Unrecognised subcommand: {}\n", c);
             print_help()?;
             std::process::exit(1);
         },
         None => {
-            println!("No subcommand provided\n");
+            error!("No subcommand provided\n");
             print_help()?;
             std::process::exit(1);
         }
@@ -256,7 +261,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
             println!("{}", serde_json::to_string_pretty(&result)?);
         },
         Some("leave") => {
-             let process_id = sub_matches.value_of("process_id").ok_or(ErrorKind::MissingArgument(s("process")))?;
+            let process_id = sub_matches.value_of("process_id").ok_or(ErrorKind::MissingArgument(s("process")))?;
 
             create_table_if_needed(&client, table_name, 1, 1)?;
             wait_for_table(&client, table_name)?;
@@ -275,15 +280,20 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
             println!("{}", serde_json::to_string_pretty(&result)?);
         },
         Some("rm") => {
-            unimplemented!()
+            create_table_if_needed(&client, table_name, 1, 1)?;
+            wait_for_table(&client, table_name)?;
+
+            let queue = Queue::new(client, table_name, id, Duration::from_millis(100));
+            
+            queue.remove()?;
         },
         Some(c) => {
-            println!("Unrecognised subcommand: {}\n", c);
+            error!("Unrecognised subcommand: {}\n", c);
             print_help()?;
             std::process::exit(1);
         },
         None => {
-            println!("No subcommand provided\n");
+            error!("No subcommand provided\n");
             print_help()?;
             std::process::exit(1);
         }
@@ -324,6 +334,10 @@ pub fn clap_app<'a,'b>() -> App<'a,'b> {
                 .about("Increment and get the value of the counter")
                 .version("0.1")
                 )
+            .subcommand(SubCommand::with_name("rm")
+                .about("Remove the counter from the table")
+                .version("0.1")
+                )
         )
         .subcommand(SubCommand::with_name("queue")
             .arg(Arg::with_name("process_id")
@@ -346,6 +360,10 @@ pub fn clap_app<'a,'b>() -> App<'a,'b> {
                 )
             .subcommand(SubCommand::with_name("leave")
                 .about("Remove the process id from the queue")
+                .version("0.1")
+                )
+            .subcommand(SubCommand::with_name("rm")
+                .about("Remove the queue from the table")
                 .version("0.1")
                 )
         )

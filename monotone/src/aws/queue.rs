@@ -106,9 +106,7 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
             ..Default::default()
         };
 
-        let result = self.client.delete_item(&delete_item_input)?;
-
-        println!("delete result: {:?}", result);
+        self.client.delete_item(&delete_item_input)?;
 
         Ok(())
     }
@@ -127,7 +125,7 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
         let item = self.client.get_item(&get_item_input)?;
 
         if let Some(item) = item.item {
-            println!("counter table={} id={} : {:?}", self.table_name, self.id, item);
+            debug!("counter table={} id={} : {:?}", self.table_name, self.id, item);
 
             let maybe_typ: &AttributeValue = item.get("Type").ok_or(ErrorKind::MissingAttribute)?;
             let typ = maybe_typ.s.as_ref().ok_or(ErrorKind::MissingAttribute)?;
@@ -152,7 +150,7 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
                 items: items,
             }))
         } else {
-            println!("empty counter table={} id={}", self.table_name, self.id);
+            debug!("empty counter table={} id={}", self.table_name, self.id);
 
             Ok(None)
         }
