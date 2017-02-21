@@ -72,7 +72,14 @@ pub fn table_name() -> String {
 }
 
 pub fn build_id() -> Option<String> {
-    env::var("TRAVIS_BUILD_ID").map(|v| Some(v)).unwrap_or(None)
+    let build_id = env::var("TRAVIS_BUILD_ID").map(|v| Some(v)).unwrap_or(None);
+    let build_number = env::var("TRAVIS_BUILD_NUMBER").map(|v| Some(v)).unwrap_or(None);
+
+    build_id.and_then(|id| {
+        build_number.and_then(|num| {
+            Some(format!("{}-{}", id, num))
+        })
+    })
 }
 
 pub fn counter_id() -> String {
@@ -97,6 +104,8 @@ pub fn it_works() {
 #[test]
 pub fn test_counter_no_row_get() {
     let c = Counter::new(client().expect("client"), table_name(), counter_id(), retry_time());
+    c.remove().expect("remove");
+
     let v = c.get_value().expect("get");
     assert_eq!(v, 0);
 }
@@ -104,6 +113,7 @@ pub fn test_counter_no_row_get() {
 #[test]
 pub fn test_counter_row_get() {
     let c = Counter::new(client().expect("client"), table_name(), counter_id(), retry_time());
+    c.remove().expect("remove");
 
     let v = c.next_value().expect("next");
     assert_eq!(v, 1);

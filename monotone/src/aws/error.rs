@@ -9,6 +9,7 @@ error_chain! {
         CreateTable(rusoto::dynamodb::CreateTableError);
         GetItem(rusoto::dynamodb::GetItemError);
         PutItem(rusoto::dynamodb::PutItemError);
+        DeleteItem(rusoto::dynamodb::DeleteItemError);
         ParseError(num::ParseIntError);
         Json(serde_json::Error);
     }

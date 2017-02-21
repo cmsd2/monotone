@@ -96,6 +96,21 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
         }
     }
 
+    pub fn remove(&self) -> Result<()> {
+        let mut key = HashMap::new();
+        key.insert(s("ID"), AttributeValue { s: Some(s(self.id.clone())), ..Default::default() });
+
+        let delete_item_input = DeleteItemInput {
+            key: key,
+            table_name: self.table_name.clone(),
+            ..Default::default()
+        };
+
+        self.client.delete_item(&delete_item_input)?;
+
+        Ok(())
+    }
+
     pub fn read(&self) -> Result<Option<QueueRow>> {
         let mut key = HashMap::new();
         key.insert(s("ID"), AttributeValue { s: Some(s(self.id.clone())), ..Default::default() });
