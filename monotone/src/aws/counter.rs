@@ -58,7 +58,9 @@ impl <P,D> Counter<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest
             ..Default::default()
         };
 
-        self.client.delete_item(&delete_item_input)?;
+        let result = self.client.delete_item(&delete_item_input)?;
+
+        println!("delete counter result: {:?}", result);
 
         Ok(())
     }
@@ -68,7 +70,7 @@ impl <P,D> Counter<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest
         key.insert(s("ID"), AttributeValue { s: Some(s(self.id.clone())), ..Default::default() });
 
         let get_item_input = GetItemInput {
-            consistent_read: Some(false),
+            consistent_read: Some(true),
             key: key,
             table_name: self.table_name.clone(),
             ..Default::default()
@@ -77,7 +79,7 @@ impl <P,D> Counter<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest
         let item = self.client.get_item(&get_item_input)?;
 
         if let Some(item) = item.item {
-            debug!("counter table={} id={} : {:?}", self.table_name, self.id, item);
+            println!("counter table={} id={} : {:?}", self.table_name, self.id, item);
 
             let maybe_typ: &AttributeValue = item.get("Type").ok_or(ErrorKind::MissingAttribute)?;
             let typ = maybe_typ.s.as_ref().ok_or(ErrorKind::MissingAttribute)?;
