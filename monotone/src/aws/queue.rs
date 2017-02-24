@@ -1,7 +1,7 @@
 use std::thread;
 use std::time::Duration;
 use std::default::Default;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use rusoto::{ProvideAwsCredentials, DispatchSignedRequest};
 use rusoto::dynamodb::*;
 use ::*;
@@ -24,13 +24,15 @@ pub struct Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
 pub struct QueuePosition {
     process_id: String,
     counter: u64,
+    tags: Option<BTreeMap<String, String>>,
 }
 
 impl QueuePosition {
-    pub fn new(process_id: String, counter: u64) -> QueuePosition {
+    pub fn new(process_id: String, counter: u64, tags: BTreeMap<String, String>) -> QueuePosition {
         QueuePosition {
             process_id: process_id,
             counter: counter,
+            tags: Some(tags),
         }
     }
 
@@ -203,7 +205,9 @@ impl <P,D> Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
 impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: DispatchSignedRequest {
     type Error = Error;
 
-    fn join_queue(&self, process_id: String) -> Result<(u64, Ticket)> {
+    fn join_queue<T>(&self, process_id: String, tags: T) -> Result<(u64, Ticket)> where T: Into<Option<BTreeMap<String, String>>> {
+        let tags = tags.into().unwrap_or(BTreeMap::new());
+        
         loop {
             let maybe_queue = self.read()?;
 
@@ -217,7 +221,7 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
                     .iter()
                     .enumerate()
                     .find(|&(_pos, t)| t.process_id == process_id)
-                    .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position)) {
+                    .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position, t.tags.clone().unwrap_or(BTreeMap::new()))) {
 
                 return Ok((queue.version, ticket))
             }
@@ -225,7 +229,7 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
             queue.value += 1;
             let position = queue.items.len();
             let counter = queue.value;
-            let ticket = QueuePosition::new(process_id.clone(), counter);
+            let ticket = QueuePosition::new(process_id.clone(), counter, tags.clone());
             
             queue.items.push(ticket);
 
@@ -239,7 +243,7 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
                     bail!(e);
                 },
                 Ok(version) => {
-                    return Ok((version, Ticket::new(process_id, counter, position)));
+                    return Ok((version, Ticket::new(process_id, counter, position, tags)));
                 }
             }
         }
@@ -277,7 +281,7 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
                 .iter()
                 .enumerate()
                 .find(|&(_pos, t)| t.process_id == process_id)
-                .map(|(position,t)| (queue.version, Ticket::new(t.process_id.clone(), t.counter, position)))
+                .map(|(position,t)| (queue.version, Ticket::new(t.process_id.clone(), t.counter, position, t.tags.clone().unwrap_or(BTreeMap::new()))))
                 .ok_or_else(|| ErrorKind::TicketNotFound(process_id.to_owned()).into())
 
         } else {
@@ -290,7 +294,7 @@ impl <P,D> MonotonicQueue for Queue<P,D> where P: ProvideAwsCredentials, D: Disp
             Ok((queue.version, queue.items
                 .iter()
                 .enumerate()
-                .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position))
+                .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position, t.tags.clone().unwrap_or(BTreeMap::new())))
                 .collect()))
         } else {
             Ok((0, vec![]))

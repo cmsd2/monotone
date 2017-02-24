@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use std::collections::BTreeMap;
 
 use ::*;
 use ::error::*;
@@ -7,13 +8,15 @@ use ::error::*;
 struct QueueTicket {
     pub process_id: String,
     pub counter: u64,
+    pub tags: BTreeMap<String, String>,
 }
 
 impl QueueTicket {
-    pub fn new(process_id: String, counter: u64) -> QueueTicket {
+    pub fn new(process_id: String, counter: u64, tags: BTreeMap<String, String>) -> QueueTicket {
         QueueTicket {
             process_id: process_id,
             counter: counter,
+            tags: tags,
         }
     }
 }
@@ -34,7 +37,7 @@ impl QueueInner {
         }
     }
 
-    fn join_queue(&mut self, process_id: String) -> Result<(u64, Ticket)> {
+    fn join_queue<T>(&mut self, process_id: String, tags: T) -> Result<(u64, Ticket)> where T: Into<Option<BTreeMap<String, String>>> {
         if let Ok((ft, ticket)) = self.get_ticket(&process_id) {
             return Ok((ft, ticket));
         }
@@ -43,12 +46,13 @@ impl QueueInner {
 
         let position = self.items.len();
         let counter = self.counter;
-        let ticket = QueueTicket::new(process_id.clone(), counter);
+        let tags = tags.into().unwrap_or(BTreeMap::new());
+        let ticket = QueueTicket::new(process_id.clone(), counter, tags.clone());
 
         self.items.push(ticket);
         self.counter += 1;
 
-        Ok((self.version, Ticket::new(process_id, counter, position)))
+        Ok((self.version, Ticket::new(process_id, counter, position, tags)))
     }
 
     fn leave_queue(&mut self, process_id: &str) -> Result<u64> {
@@ -68,7 +72,7 @@ impl QueueInner {
             .iter()
             .enumerate()
             .find(|&(_pos, t)| t.process_id == process_id)
-            .map(|(position,t)| (self.version, Ticket::new(t.process_id.clone(), t.counter, position)))
+            .map(|(position,t)| (self.version, Ticket::new(t.process_id.clone(), t.counter, position, t.tags.clone())))
             .ok_or_else(|| ErrorKind::NotFound(process_id.to_owned()).into())
     }
 
@@ -76,7 +80,7 @@ impl QueueInner {
         Ok((self.version, self.items
             .iter()
             .enumerate()
-            .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position))
+            .map(|(position,t)| Ticket::new(t.process_id.clone(), t.counter, position, t.tags.clone()))
             .collect()))
     }
 }
@@ -97,10 +101,10 @@ impl Queue {
 impl MonotonicQueue for Queue {
     type Error = Error;
     
-    fn join_queue(&self, process_id: String) -> Result<(u64, Ticket)> {
+    fn join_queue<T>(&self, process_id: String, tags: T) -> Result<(u64, Ticket)> where T: Into<Option<BTreeMap<String, String>>> {
         let mut inner = self.items.lock().unwrap();
 
-        inner.join_queue(process_id)
+        inner.join_queue(process_id, tags)
     }
 
     fn leave_queue(&self, process_id: &str) -> Result<u64> {
@@ -148,7 +152,7 @@ mod tests {
     #[test]
     pub fn test_queue_row_get() {
         let q = Queue::new();
-        let (ft, tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(&tok.process_id, "foo");
         assert_eq!(tok.counter, 0);
@@ -170,7 +174,7 @@ mod tests {
     #[test]
     pub fn test_queue_row_get_all() {
         let q = Queue::new();
-        let (ft, tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(&tok.process_id, "foo");
         assert_eq!(tok.counter, 0);
@@ -184,7 +188,7 @@ mod tests {
     #[test]
     pub fn test_queue_no_row_join() {
         let q = Queue::new();
-        let (ft, tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(&tok.process_id, "foo");
         assert_eq!(tok.counter, 0);
@@ -194,13 +198,13 @@ mod tests {
     #[test]
     pub fn test_queue_same_row_join() {
         let q = Queue::new();
-        let (ft, tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(&tok.process_id, "foo");
         assert_eq!(tok.counter, 0);
         assert_eq!(tok.position, 0);
 
-        let (ft, tok2) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok2) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(tok2, tok);
     }
@@ -208,13 +212,13 @@ mod tests {
     #[test]
     pub fn test_queue_different_row_join() {
         let q = Queue::new();
-        let (ft, tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(&tok.process_id, "foo");
         assert_eq!(tok.counter, 0);
         assert_eq!(tok.position, 0);
 
-        let (ft, tok) = q.join_queue(s("bar")).expect("join");
+        let (ft, tok) = q.join_queue(s("bar"), None).expect("join");
         assert_eq!(ft, 2);
         assert_eq!(&tok.process_id, "bar");
         assert_eq!(tok.counter, 1);
@@ -230,7 +234,7 @@ mod tests {
     #[test]
     pub fn test_queue_row_leave() {
         let q = Queue::new();
-        let (ft, _tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, _tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
 
         let ft = q.leave_queue("foo").expect("leave");
@@ -240,11 +244,11 @@ mod tests {
     #[test]
     pub fn test_queue_get_after_leave() {
         let q = Queue::new();
-        let (ft, tok) = q.join_queue(s("foo")).expect("join");
+        let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
         assert_eq!(ft, 1);
         assert_eq!(tok.position, 0);
   
-        let (ft, tok) = q.join_queue(s("bar")).expect("join");
+        let (ft, tok) = q.join_queue(s("bar"), None).expect("join");
         assert_eq!(ft, 2);
         assert_eq!(tok.position, 1);
 

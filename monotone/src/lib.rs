@@ -20,6 +20,7 @@ pub mod string;
 pub mod time;
 
 use std::result;
+use std::collections::BTreeMap;
 
 pub trait MonotonicCounter {
     type Error;
@@ -36,14 +37,16 @@ pub struct Ticket {
     pub process_id: String,
     pub counter: u64,
     pub position: usize,
+    pub tags: BTreeMap<String, String>,
 }
 
 impl Ticket {
-    pub fn new(process_id: String, counter: u64, position: usize) -> Ticket {
+    pub fn new(process_id: String, counter: u64, position: usize, tags: BTreeMap<String, String>) -> Ticket {
         Ticket {
             process_id: process_id,
             counter: counter,
             position: position,
+            tags: tags,
         }
     }
 }
@@ -51,7 +54,7 @@ impl Ticket {
 pub trait MonotonicQueue {
     type Error;
 
-    fn join_queue(&self, process_id: String) -> result::Result<(FencingToken, Ticket), Self::Error>;
+    fn join_queue<T>(&self, process_id: String, tags: T) -> result::Result<(FencingToken, Ticket), Self::Error> where T: Into<Option<BTreeMap<String, String>>>;
 
     fn leave_queue(&self, process_id: &str) -> result::Result<FencingToken, Self::Error>;
 

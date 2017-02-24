@@ -210,7 +210,7 @@ pub fn test_queue_no_row_get() {
 pub fn test_queue_row_get() {
     let q = TestQueue::new();
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
@@ -234,7 +234,7 @@ pub fn test_queue_no_row_get_all() {
 pub fn test_queue_row_get_all() {
     let q = TestQueue::new();
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
@@ -249,13 +249,13 @@ pub fn test_queue_row_get_all() {
 pub fn test_queue_same_row_join() {
     let q = TestQueue::new();
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
     assert_eq!(tok.position, 0);
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
@@ -270,13 +270,13 @@ pub fn test_queue_same_row_join() {
 pub fn test_queue_different_row_join() {
     let q = TestQueue::new();
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
     assert_eq!(tok.position, 0);
 
-    let (ft, tok) = q.join_queue(s("bar")).expect("join");
+    let (ft, tok) = q.join_queue(s("bar"), None).expect("join");
     assert_eq!(ft, 2);
     assert_eq!(&tok.process_id, "bar");
     assert_eq!(tok.counter, 2);
@@ -304,7 +304,7 @@ pub fn test_queue_no_row_leave() {
 pub fn test_queue_row_leave() {
     let q = TestQueue::new();
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
@@ -326,17 +326,15 @@ pub fn test_queue_row_interleaved_write_leave() {
 
 #[test]
 pub fn test_queue_rows_leave() {
-#[test]
-pub fn test_queue_row_leave() {
     let q = TestQueue::new();
 
-    let (ft, tok) = q.join_queue(s("foo")).expect("join");
+    let (ft, tok) = q.join_queue(s("foo"), None).expect("join");
     assert_eq!(ft, 1);
     assert_eq!(&tok.process_id, "foo");
     assert_eq!(tok.counter, 1);
     assert_eq!(tok.position, 0);
 
-    let (ft, tok) = q.join_queue(s("bar")).expect("join");
+    let (ft, tok) = q.join_queue(s("bar"), None).expect("join");
     assert_eq!(ft, 2);
     assert_eq!(&tok.process_id, "bar");
     assert_eq!(tok.counter, 2);
@@ -350,7 +348,6 @@ pub fn test_queue_row_leave() {
     assert_eq!(&tok.process_id, "bar");
     assert_eq!(tok.counter, 2);
     assert_eq!(tok.position, 0);
-}
 }
 
 }

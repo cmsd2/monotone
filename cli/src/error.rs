@@ -23,5 +23,10 @@ error_chain! {
             description("missing argument")
             display("missing argument: {}", a)
         }
+
+        InvalidTag(t: String) {
+            description("invalid tag")
+            display("invalid tag: {}", t)
+        }
     }
 }

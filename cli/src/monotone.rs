@@ -15,6 +15,7 @@ pub mod error;
 
 use std::time::Duration;
 use std::str::FromStr;
+use std::collections::BTreeMap;
 use rusoto::{DefaultCredentialsProvider, Region, ProvideAwsCredentials, DispatchSignedRequest};
 use rusoto::dynamodb::*;
 use rusoto::default_tls_client;
@@ -66,6 +67,7 @@ pub struct QueueTicket {
     pub process_id: String,
     pub counter: u64,
     pub position: usize,
+    pub tags: BTreeMap<String, String>,
 }
 
 fn main() {
@@ -204,6 +206,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
                     process_id: s(ticket.process_id),
                     counter: ticket.counter,
                     position: ticket.position,
+                    tags: ticket.tags,
                 }
             };
 
@@ -223,6 +226,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
                     process_id: s(t.process_id),
                     counter: t.counter,
                     position: t.position,
+                    tags: t.tags,
                 });
             }
 
@@ -237,6 +241,10 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
             println!("{}", serde_json::to_string_pretty(&result)?);
         },
         Some("join") => {
+            let join_matches = sub_matches.subcommand_matches("join").unwrap();
+
+            let tags = join_matches.values_of("tag").map(|values| parse_tags(values)).unwrap_or(Ok(BTreeMap::new()))?;
+
             let process_id = sub_matches.value_of("process_id").ok_or(ErrorKind::MissingArgument(s("process")))?;
 
             create_table_if_needed(&client, table_name, 1, 1)?;
@@ -244,7 +252,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
 
             let queue = Queue::new(client, table_name, id, Duration::from_millis(100));
 
-            let (version, ticket) = queue.join_queue(s(process_id))?;
+            let (version, ticket) = queue.join_queue(s(process_id), tags)?;
 
             let result = QueueTicketOutput {
                 id: s(id),
@@ -255,6 +263,7 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
                     process_id: s(ticket.process_id),
                     counter: ticket.counter,
                     position: ticket.position,
+                    tags: ticket.tags,
                 }
             };
 
@@ -300,6 +309,19 @@ pub fn run_queue<'a,P,D>(region: Region, client: DynamoDbClient<P,D>, matches: &
     }
 
     Ok(())
+}
+
+pub fn parse_tags<'a, I>(tags: I) -> Result<BTreeMap<String, String>> where I: Iterator<Item=&'a str> {
+    let mut result = BTreeMap::new();
+    for t in tags {
+        let parts = t.splitn(2, "=").collect::<Vec<&'a str>>();
+        if parts.len() == 2 {
+            result.insert(s(parts[0]), s(parts[1]));
+        } else {
+            bail!(ErrorKind::InvalidTag(s(t)));
+        }
+    }
+    Ok(result)
 }
 
 pub fn clap_app<'a,'b>() -> App<'a,'b> {
@@ -357,6 +379,14 @@ pub fn clap_app<'a,'b>() -> App<'a,'b> {
             .subcommand(SubCommand::with_name("join")
                 .about("Add the process id to the back of the queue")
                 .version("0.1")
+                .arg(Arg::with_name("tag")
+                    .short("t")
+                    .long("tag")
+                    .value_name("TAG")
+                    .help("Tag value")
+                    .takes_value(true)
+                    .multiple(true)
+                    )
                 )
             .subcommand(SubCommand::with_name("leave")
                 .about("Remove the process id from the queue")
