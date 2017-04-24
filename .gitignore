@@ -1,4 +1,3 @@
 target
-Cargo.lock
 terraform/*.tfvars
 .terraform
