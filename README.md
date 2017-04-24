@@ -30,7 +30,7 @@ The default is just the in-memory backend.
 
 ```
 [dependencies]
-monotone = { version = "0.1", features = ["aws"] }
+monotone = { version = "0.4", features = ["aws"] }
 ```
 
 ### CLI on Laptop / Development env
