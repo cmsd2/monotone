@@ -32,6 +32,13 @@ jobs:
         run: cargo clippy -p monotone --all-targets --locked
       - name: Docs
         run: cargo doc --workspace --all-features --no-deps --locked
+      - name: Default library build has no I/O dependencies
+        run: |
+          deps=$(cargo tree -p monotone -e normal --prefix none --locked)
+          if echo "$deps" | grep -E '^(tokio|hyper|aws-)'; then
+            echo "::error::default features pull in an async runtime, HTTP stack or AWS SDK"
+            exit 1
+          fi
 
   test:
     name: Test (stable)

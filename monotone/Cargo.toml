@@ -28,8 +28,10 @@ tokio = { workspace = true, optional = true, features = ["time"] }
 tracing = { workspace = true, optional = true }
 
 [dev-dependencies]
+aws-smithy-http-client.workspace = true
+http.workspace = true
 proptest.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time", "sync", "test-util"] }
 
 [package.metadata.docs.rs]
 all-features = true
