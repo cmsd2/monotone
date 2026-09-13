@@ -40,8 +40,8 @@
 ## 6. CI and repository hygiene
 
 - [x] 6.1 Delete `.travis.yml` and confirm no other file in the tree contains an `AKIA` access key ID; verify `git grep -nE 'AKIA[0-9A-Z]{16}'` returns nothing
-- [ ] 6.2 Add `.github/workflows/ci.yml` with `lint`, `test` (stable with the committed lock plus an MSRV 1.88 build using fallback resolution, `amazon/dynamodb-local` service on 8000, env `AWS_ENDPOINT_URL`, placeholder credentials and region) and a non-required `audit` job running cargo-audit and cargo-deny; verify the required jobs pass on a push to a branch
-- [ ] 6.3 Make integration and CLI tests self-skip only when `AWS_ENDPOINT_URL` is unset locally but hard-fail in CI by setting `MONOTONE_REQUIRE_INTEGRATION=1` in the workflow; verify a CI run with the service removed fails
+- [x] 6.2 Add `.github/workflows/ci.yml` with `lint`, `test` (stable with the committed lock plus an MSRV 1.88 build using fallback resolution, `amazon/dynamodb-local` service on 8000, env `AWS_ENDPOINT_URL`, placeholder credentials and region) and a non-required `audit` job running cargo-audit and cargo-deny; verify the required jobs pass on a push to a branch
+- [x] 6.3 Make integration and CLI tests self-skip only when `AWS_ENDPOINT_URL` is unset locally but hard-fail in CI by setting `MONOTONE_REQUIRE_INTEGRATION=1` in the workflow; verify a CI run with the service removed fails
 - [ ] 6.4 Add `.github/workflows/audit.yml` on a weekly cron running `cargo audit`; verify it appears under Actions and a manual `workflow_dispatch` run succeeds
 - [ ] 6.5 Add `.github/workflows/release.yml` on `v*` tags: check both manifests equal the tag, run the full check, `cargo publish -p monotone`, wait for the index, `cargo publish -p monotone-cli`, build binaries for linux x86_64, macOS aarch64 and macOS x86_64, and create a GitHub release with them attached; pre-release tags such as `v0.5.0-rc.1` run a publish dry run and create no GitHub release; verify a `v0.5.0-rc.1` tag run passes every job and publishes nothing
 - [ ] 6.6 Enable secret scanning and push protection on the GitHub repository and add Dependabot config for cargo and github-actions ecosystems; verify `gh api repos/cmsd2/monotone --jq .security_and_analysis` shows both enabled
@@ -55,6 +55,6 @@
 
 ## 8. Final verification
 
-- [ ] 8.1 Run the full local suite with DynamoDB Local in Docker: `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features`; verify all pass with zero warnings, and record the `cargo audit` and `cargo deny check` results
+- [x] 8.1 Run the full local suite with DynamoDB Local in Docker: `cargo fmt --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --all-features`; verify all pass with zero warnings, and record the `cargo audit` and `cargo deny check` results
 - [ ] 8.2 Check the Dependabot alert list after the lock file lands on master; verify every alert from the rusoto-era lock files is closed and any remaining alert is listed in `deny.toml` with a reason
-- [ ] 8.3 Walk every scenario in the baseline and delta specs and map it to a test name; verify the mapping table in the pull request description has no gaps
+- [x] 8.3 Walk every scenario in the baseline and delta specs and map it to a test name; verify the mapping table in the pull request description has no gaps
