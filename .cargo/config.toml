@@ -1,0 +1,5 @@
+# The committed lock file tracks the newest dependency releases, even when they
+# need a newer rustc than the declared rust-version. The MSRV CI job
+# re-resolves with `incompatible-rust-versions = "fallback"` before building.
+[resolver]
+incompatible-rust-versions = "allow"

@@ -1,0 +1,9 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc e8b68bc20d63b2577cfaf5e1a5b3f0b4ccec0d7a38f304546843b4011d44b996 # shrinks to script = [(Join(0, {}), Some(Next))]
+cc d013f9b84790e8f291c2ce7497ddc888c5c15bd06fb53adbb122e97eecbbb206 # shrinks to script = [(Join(4, {}), None), (Next, Some(Join(1, {}))), (Join(1, {}), Some(Leave(4)))]
+cc 1d275106b1d84f1ea489d1e717f703d1ae9cae1665e17828928b93c344d25285 # shrinks to script = [(Leave(4), Some(Join(4, {})))]

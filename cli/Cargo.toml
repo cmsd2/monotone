@@ -1,23 +1,33 @@
 [package]
 name = "monotone-cli"
-version = "0.4.0"
-authors = ["Chris Dawes <cmsd2@cantab.net>"]
-license = "Apache-2.0"
-description = "Monotonic counter cli implemented on top of AWS DynamoDB."
-repository = "https://github.com/cmsd2/monotone"
-categories = ["algorithms", "concurrency", "data-structures", "network-programming"]
-keywords = ["monotonic", "counter", "distributed", "AWS"]
-
-[dependencies]
-error-chain = "0.9.0"
-rusoto = { version = "0.24.0", features = ["dynamodb"]}
-env_logger = "0.4.0"
-log = "0.3.6"
-clap = "2.20.4"
-monotone = { path = "../monotone", features = ["aws"], version = "0.4" }
-serde = "0.9"
-serde_derive = "0.9"
-serde_json = "0.9"
+description = "Command-line front end for monotone counters and queues on AWS DynamoDB."
+readme = "../README.md"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
 
 [[bin]]
 name = "monotone"
+path = "src/main.rs"
+# The library is also named monotone; documenting both collides.
+doc = false
+
+[dependencies]
+monotone = { workspace = true, features = ["dynamodb"] }
+aws-sdk-dynamodb.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, features = ["macros", "rt"] }
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
+serde_json.workspace = true

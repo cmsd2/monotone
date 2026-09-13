@@ -1,75 +1,117 @@
 # monotone
-[![Build Status](https://travis-ci.org/cmsd2/monotone.svg?branch=master)](https://travis-ci.org/cmsd2/monotone)
 
-Counters and queues for configuration management in distributed systems
+[![CI](https://github.com/cmsd2/monotone/actions/workflows/ci.yml/badge.svg)](https://github.com/cmsd2/monotone/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/monotone.svg)](https://crates.io/crates/monotone)
+[![docs.rs](https://docs.rs/monotone/badge.svg)](https://docs.rs/monotone)
 
-Monotone is a library and cli for maintaining atomic counters and queues.
-The implementations are designed with configuration management in mind.
-Note the counters are not performance counters for use in event tracking.
+Monotonic counters and fenced queues for coordination in distributed systems.
 
-Two implementations are include:
+A **counter** is a named `u64` that only goes up. A **queue** is an ordered list
+of process IDs. Each process that joins gets a counter value that is never
+reused, and every write bumps a **fencing token** so callers can detect a stale
+view. They are built for configuration management: assigning member IDs,
+picking a leader, versioning. They are not performance counters.
 
-1. a single-process implementation, synchronised by `Arc<Mutex<...>>`
-2. a DynamoDb implementation which uses conditional updates for optimistic locking
+The repository holds two crates:
 
-## Documentation
+- [`monotone`](monotone) is the library, with an in-memory backend and a
+  DynamoDB backend that uses conditional writes for optimistic locking.
+- [`monotone-cli`](cli) builds the `monotone` binary, a JSON-printing front end
+  over the DynamoDB backend.
 
-[https://docs.rs/monotone](https://docs.rs/monotone)
+All counter and queue rules live in a sans-IO core that performs no I/O. Each
+backend executes the core's read, conditional-write and sleep effects, so both
+backends behave identically and the retry logic is tested without a database.
 
-## Building / Installing
+## Library
 
-The source repository contains two projects. The library is called monotone, and the
-cli lives in a folder called cli, although it builds an executable file called monotone.
-
-### Library
-
-You can link to the library by adding it as a dependency to your Cargo.toml as usual.
-Select the `aws` feature to bring in rusoto and use the DynamoDb backend.
-
-The default is just the in-memory backend.
-
-```
+```toml
 [dependencies]
-monotone = { version = "0.4", features = ["aws"] }
+monotone = "0.5"
+
+# With the DynamoDB backend:
+monotone = { version = "0.5", features = ["dynamodb"] }
 ```
 
-### CLI on Laptop / Development env
+The minimum supported Rust version is 1.88. The default build has no network,
+TLS or async runtime dependencies.
 
-Install rust. Stable rust is fine, but it should be at least 1.15.
+### In memory
 
-Consider using rustup: https://www.rustup.rs
+```rust
+use monotone::memory::Store;
+use monotone::{MonotonicCounter, MonotonicQueue};
 
-Then run `cargo install monotone` to install the version from https://crates.io
-or `cargo install --path=.` to install directly from checked out source.
+#[tokio::main]
+async fn main() -> Result<(), monotone::Error> {
+    let store = Store::new();
 
-### CLI on CI / CD
+    let builds = store.counter("builds");
+    assert_eq!(builds.next_value().await?, 1);
+    assert_eq!(builds.next_value().await?, 2);
 
-Either install the rust toolchain on your jenkins or use a docker container like this one: https://hub.docker.com/r/jimmycuadra/rust/
+    let cluster = store.queue("zookeeper");
+    let (token, ticket) = cluster.join_queue("host-a", None).await?;
+    assert_eq!((token, ticket.counter, ticket.position), (1, 1, 0));
+    Ok(())
+}
+```
 
-Then build as you would in your dev env and copy the built artifact somewhere safe.
+### On DynamoDB
 
-## Testing
+```rust,no_run
+use monotone::dynamodb::{self, table, Queue};
+use monotone::MonotonicQueue;
 
-The `monotone/tests` folder contains integration tests.
-The `terraform` folder contains infrastructure definitions for running the integration tests. See the readme file there.
+#[tokio::main]
+async fn main() -> Result<(), dynamodb::Error> {
+    let config = dynamodb::load_config(Some("eu-west-1".into())).await;
+    let client = aws_sdk_dynamodb::Client::new(&config);
+    table::create_table_if_needed(&client, "Counters", 1, 1).await?;
+    table::wait_for_table(&client, "Counters").await?;
 
-## Cli commands
+    let queue = Queue::new(client, "Counters", "myzkcluster");
+    let (fencing_token, ticket) = queue.join_queue("host-a", None).await?;
+    println!("server id {} (token {fencing_token})", ticket.counter);
+    Ok(())
+}
+```
 
-Each counter or queue is stored in its own row in the table in DynamoDb.
-The `-i` parameter selects which row.
-The cli will prevent you running counter commands on a queue and visa versa.
+Credentials, region and endpoint come from the standard AWS configuration
+chain. `load_config` overrides the region when you pass one.
+
+## CLI
+
+Install from crates.io, or download a binary from the
+[releases page](https://github.com/cmsd2/monotone/releases):
+
+```sh
+cargo install monotone-cli
+```
+
+Every invocation acts on one counter or queue row and prints JSON to stdout.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `-i, --id <ID>` | required | Counter or queue ID |
+| `-t, --table <TABLE>` | `Counters` | DynamoDB table; created on first use |
+| `-r, --region <REGION>` | `eu-west-1` | AWS region |
+| `-p, --process <PROCESS_ID>` | | Process ID, for `queue get`, `join` and `leave` |
+
+Credentials come from the standard AWS chain. Set `AWS_ENDPOINT_URL` to target
+DynamoDB Local. Set `RUST_LOG=debug` for diagnostics on stderr. Failures print
+`error: ...` to stderr and exit with status 1.
+
+A counter command on a queue's ID, or the reverse, fails rather than corrupting
+the row.
 
 ### Counter
 
-Counter is a simple atomic counter. Run like so:
-
-```
+```sh
 monotone -i mycounter counter get
 ```
 
-will return
-
-```
+```json
 {
   "id": "mycounter",
   "value": 0,
@@ -78,80 +120,38 @@ will return
 }
 ```
 
-Increment the counter like so:
-
-```
-monotone -i mycounter counter next
-```
-
-will return
-
-```
-{
-  "id": "mycounter",
-  "value": 1,
-  "region": "eu-west-1",
-  "table": "Counters"
-}
-```
+`counter next` increments and prints the new value. `counter rm` deletes the row
+and prints nothing.
 
 ### Queue
 
-The queue is a list of string process IDs. Each entry in the queue is given the monotonic counter value when it joins the list.
-The list is sorted in ascending order of counter value.
-
-The queue contains a fencing token which is returned by all operations.
-This will monotonically increase with every write to storage.
-Use this for conditional updates in other systems to prevent acting on a stale view of the queue.
-
-Add a process ID to the queue like so:
-
-```
+```sh
 monotone -i myqueue queue -p foo join
+monotone -i myqueue queue -p bar join --tag role=zk --tag rack=a
 ```
 
-which will output something like this:
-
-```
+```json
 {
   "id": "myqueue",
   "region": "eu-west-1",
   "table": "Counters",
-  "fencing_token": 1,
+  "fencing_token": 2,
   "ticket": {
-    "process_id": "foo",
-    "counter": 1,
-    "position": 0
+    "process_id": "bar",
+    "counter": 2,
+    "position": 1,
+    "tags": {
+      "rack": "a",
+      "role": "zk"
+    }
   }
 }
 ```
 
-You can also remove a node (for tidyness) like so:
+Joining again with the same process ID returns the existing ticket and does not
+bump the token. `queue list` prints every ticket in position order:
 
-```
-monotone -i myqueue queue -p foo leave
-```
-
-which prints output:
-
-```
-{
-  "id": "myqueue",
-  "region": "eu-west-1",
-  "table": "Counters",
-  "fencing_token": 2
-}
-```
-
-To list the nodes use:
-
-```
-monotone -i myqueue queue list
-```
-
-which will output something like this:
-
-```
+```json
 {
   "id": "myqueue",
   "region": "eu-west-1",
@@ -161,38 +161,110 @@ which will output something like this:
     {
       "process_id": "foo",
       "counter": 1,
-      "position": 0
+      "position": 0,
+      "tags": {}
+    },
+    {
+      "process_id": "bar",
+      "counter": 2,
+      "position": 1,
+      "tags": {
+        "rack": "a",
+        "role": "zk"
+      }
     }
   ]
 }
 ```
 
-## Example Usecases
+`queue -p foo leave` removes the process. Later processes move forward one
+position and keep their counters:
 
-### Assigning server IDs to nodes in a Zookeeper cluster
-
-Zookeeper is a good place to store atomic counters like the ones implemented in this crate.
-But what if you don't have a zookeeper cluster yet and you're trying to build one?
-You have to build on something you do have, like DynamoDb.
-
-On first boot, run the cli's queue command like so (make very sure your hostnames are unique e.g. EC2 instance IDs!):
-
-```
-monotone -i myzkcluster queue -p $(hostname -f) join | jq .ticket.counter
+```json
+{
+  "id": "myqueue",
+  "region": "eu-west-1",
+  "table": "Counters",
+  "fencing_token": 3
+}
 ```
 
-Write the resulting value to `/etc/zookeeper/conf/myid` as appropriate.
+`queue -p foo get` prints one ticket, or exits 1 with
+`error: ticket not found for process_id foo`. `queue rm` deletes the queue.
 
-Note the zookeeper docs say the server ID must be between 0 and 255.
-Monotone uses the full range of u64 integers.
+## Example uses
+
+### Assigning server IDs to a Zookeeper cluster
+
+Zookeeper stores atomic counters well, but you cannot use it to bootstrap
+itself. On each node's first boot, join a queue with a unique host name (an EC2
+instance ID works) and write the counter to `myid`:
+
+```sh
+monotone -i myzkcluster queue -p "$(hostname -f)" join | jq .ticket.counter > /etc/zookeeper/conf/myid
+```
+
+Zookeeper server IDs must fall between 1 and 255. Monotone issues the full
+`u64` range, so recycle the queue before it runs out.
 
 ### Simple leader election or lock
 
-The list of nodes in the queue is enough to nominate a distinguished process or leader.
+Treat the process at position 0 as the leader. This has limits:
 
-Just use the first process in the queue.
+1. Nothing checks liveness, so a failed process stays in the queue until
+   something removes it.
+2. Pass the fencing token to downstream conditional writes so a leader acting on
+   a stale view is rejected.
 
-There are several limitations:
+## Storage format
 
-1. There's no liveness checking to remove failed processes from the queue
-2. You must use the fencing token to ensure the queue hasn't changed while acting as leader / holding the lock.
+Counters and queues share one table with a string hash key `ID`. Each row has a
+`Type` (`COUNTER` or `QUEUE`), a numeric `Version` used for conditional writes,
+and a numeric `Value`. Queue rows add `Items`, a string set of JSON entries.
+Version 0.5 reads and writes rows created by 0.4.
+
+## Development
+
+```sh
+docker run -d -p 8000:8000 amazon/dynamodb-local -jar DynamoDBLocal.jar -inMemory -sharedDb
+
+export AWS_ENDPOINT_URL=http://localhost:8000
+export AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_REGION=eu-west-1
+
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+```
+
+Without `AWS_ENDPOINT_URL`, the DynamoDB and CLI integration tests print a
+notice and pass. Set `MONOTONE_REQUIRE_INTEGRATION=1` to make them fail instead,
+as CI does. The [`terraform`](terraform) module provisions optional credentials
+for running the tests against real AWS.
+
+`cargo audit` and `cargo deny check` run in CI as advisory reports. Record any
+advisory you accept in `deny.toml` with a reason.
+
+## Migrating from 0.4
+
+- `MonotonicCounter` and `MonotonicQueue` are async. Await every call inside a
+  tokio runtime.
+- `join_queue` takes `&str` for the process ID.
+- `monotone::local` is now `monotone::memory`. Create a `memory::Store` and take
+  counters and queues from it.
+- `monotone::aws` is now `monotone::dynamodb`, built on `aws-sdk-dynamodb`.
+  Construct backends with an SDK `Client`, a table name and an ID. The `aws`
+  feature still works as an alias for `dynamodb`.
+- Errors are plain enums: `monotone::Error` for the core and memory backend,
+  `monotone::dynamodb::Error` for DynamoDB.
+- The in-memory queue now issues counter 1 to the first joiner, matching
+  DynamoDB.
+- The CLI's `join` takes `--tag KEY=VALUE`. The `-t` short flag always means
+  `--table`.
+
+## Releasing
+
+See [RELEASING.md](RELEASING.md).
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
