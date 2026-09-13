@@ -1,3 +1,5 @@
 target
 terraform/*.tfvars
 .terraform
+.terraform.lock.hcl
+*.tfstate*
