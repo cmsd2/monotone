@@ -21,6 +21,11 @@ pub mod memory;
 
 pub use crate::core::error::Error;
 
+/// Compiles and runs the Rust examples in README.md.
+#[cfg(all(doctest, feature = "dynamodb"))]
+#[doc = include_str!("../../README.md")]
+pub struct ReadmeDoctests;
+
 /// A token that increases by exactly one with every write to a queue.
 ///
 /// Compare it in downstream conditional updates to avoid acting on a stale

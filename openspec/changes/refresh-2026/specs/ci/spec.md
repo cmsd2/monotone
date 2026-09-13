@@ -56,7 +56,7 @@ A workflow SHALL run `cargo audit` on a weekly schedule against the default bran
 - **THEN** the audit runs and reports failure if any advisory applies
 
 ### Requirement: Tag-driven release
-Pushing a tag of the form `v<semver>` SHALL trigger a release workflow that verifies both crate manifests declare a version equal to the tag, runs the full check, publishes the library and then the CLI to crates.io using a repository secret holding a crates.io token, and creates a GitHub release with CLI binaries for Linux x86_64, macOS aarch64 and macOS x86_64 attached.
+Pushing a tag of the form `v<semver>` SHALL trigger a release workflow. The workflow SHALL first verify that both crate manifests declare the tag's version with any pre-release suffix removed, then run the full check and build CLI binaries for Linux x86_64, macOS aarch64 and macOS x86_64. For a tag without a pre-release suffix it SHALL publish the library and then the CLI to crates.io using a repository secret holding a crates.io token, and create a GitHub release with the binaries attached. For a pre-release tag such as `v0.5.0-rc.1` it SHALL run a publish dry run instead, publish nothing, and create no GitHub release.
 
 #### Scenario: Version mismatch
 - **WHEN** tag `v0.5.1` is pushed but the manifests declare 0.5.0
@@ -65,6 +65,10 @@ Pushing a tag of the form `v<semver>` SHALL trigger a release workflow that veri
 #### Scenario: Successful release
 - **WHEN** tag `v0.5.0` is pushed and manifests declare 0.5.0
 - **THEN** `monotone 0.5.0` and `monotone-cli 0.5.0` appear on crates.io and a GitHub release `v0.5.0` exists with three binaries
+
+#### Scenario: Rehearsal tag
+- **WHEN** tag `v0.5.0-rc.1` is pushed and manifests declare 0.5.0
+- **THEN** every job passes, the publish step runs as a dry run, nothing appears on crates.io, and no GitHub release is created
 
 ### Requirement: Repository secret hygiene
 The working tree SHALL contain no cloud access key IDs or secrets. GitHub secret scanning and push protection SHALL be enabled on the repository.

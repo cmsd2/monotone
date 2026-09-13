@@ -39,18 +39,18 @@
 
 ## 6. CI and repository hygiene
 
-- [ ] 6.1 Delete `.travis.yml` and confirm no other file in the tree contains an `AKIA` access key ID; verify `git grep -n AKIA` returns nothing
+- [x] 6.1 Delete `.travis.yml` and confirm no other file in the tree contains an `AKIA` access key ID; verify `git grep -nE 'AKIA[0-9A-Z]{16}'` returns nothing
 - [ ] 6.2 Add `.github/workflows/ci.yml` with `lint`, `test` (stable with the committed lock plus an MSRV 1.88 build using fallback resolution, `amazon/dynamodb-local` service on 8000, env `AWS_ENDPOINT_URL`, placeholder credentials and region) and a non-required `audit` job running cargo-audit and cargo-deny; verify the required jobs pass on a push to a branch
 - [ ] 6.3 Make integration and CLI tests self-skip only when `AWS_ENDPOINT_URL` is unset locally but hard-fail in CI by setting `MONOTONE_REQUIRE_INTEGRATION=1` in the workflow; verify a CI run with the service removed fails
 - [ ] 6.4 Add `.github/workflows/audit.yml` on a weekly cron running `cargo audit`; verify it appears under Actions and a manual `workflow_dispatch` run succeeds
-- [ ] 6.5 Add `.github/workflows/release.yml` on `v*` tags: check both manifests equal the tag, run the full check, `cargo publish -p monotone`, wait for the index, `cargo publish -p monotone-cli`, build binaries for linux x86_64, macOS aarch64 and macOS x86_64, and create a GitHub release with them attached; verify a dry run on a `v0.5.0-rc.1` tag with `--dry-run` publishes succeeds up to the publish step
+- [ ] 6.5 Add `.github/workflows/release.yml` on `v*` tags: check both manifests equal the tag, run the full check, `cargo publish -p monotone`, wait for the index, `cargo publish -p monotone-cli`, build binaries for linux x86_64, macOS aarch64 and macOS x86_64, and create a GitHub release with them attached; pre-release tags such as `v0.5.0-rc.1` run a publish dry run and create no GitHub release; verify a `v0.5.0-rc.1` tag run passes every job and publishes nothing
 - [ ] 6.6 Enable secret scanning and push protection on the GitHub repository and add Dependabot config for cargo and github-actions ecosystems; verify `gh api repos/cmsd2/monotone --jq .security_and_analysis` shows both enabled
 
 ## 7. Terraform and documentation
 
-- [ ] 7.1 Update `terraform/` to current provider syntax (`required_providers`, `templatefile` instead of `template_file`), extend the IAM policy to include `DescribeTable`, `CreateTable` and `ListTables`, and rewrite `terraform/README.md` to describe it as optional real-AWS test infrastructure; verify `terraform validate` passes
-- [ ] 7.2 Rewrite `README.md`: GitHub Actions badge, async usage example, `dynamodb` feature, MSRV, DynamoDB Local instructions with `AWS_ENDPOINT_URL`, CLI examples showing `tags` in output and `--tag`, and a 0.4 to 0.5 migration section; verify every code block compiles or runs as written
-- [ ] 7.3 Rewrite `RELEASING.md` for the workspace and tag-driven release (bump both versions, update README, commit, tag `vX.Y.Z`, push tag, watch the release workflow); verify the steps match `release.yml`
+- [x] 7.1 Update `terraform/` to current provider syntax (`required_providers`, `templatefile` instead of `template_file`), extend the IAM policy to include `DescribeTable`, `CreateTable` and `ListTables`, rename the Travis-specific user, and rewrite `terraform/README.md` to describe it as optional real-AWS test infrastructure; verify `terraform validate` passes
+- [x] 7.2 Rewrite `README.md`: GitHub Actions badge, async usage example, `dynamodb` feature, MSRV, DynamoDB Local instructions with `AWS_ENDPOINT_URL`, CLI examples showing `tags` in output and `--tag`, and a 0.4 to 0.5 migration section; verify every code block compiles or runs as written
+- [x] 7.3 Rewrite `RELEASING.md` for the workspace and tag-driven release (bump both versions, update README, commit, tag `vX.Y.Z`, push tag, watch the release workflow); verify the steps match `release.yml`
 - [ ] 7.4 Close GitHub issue #1 (rusoto migration) with a comment referencing the change once merged; verify the issue is closed
 
 ## 8. Final verification

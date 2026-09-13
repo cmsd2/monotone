@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy (all features)
+        run: cargo clippy --workspace --all-targets --all-features --locked
+      - name: Clippy (library, default features)
+        run: cargo clippy -p monotone --all-targets --locked
+      - name: Docs
+        run: cargo doc --workspace --all-features --no-deps --locked
+
+  test:
+    name: Test (stable)
+    runs-on: ubuntu-latest
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+          - 8000:8000
+    env:
+      AWS_ENDPOINT_URL: http://localhost:8000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_REGION: eu-west-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      MONOTONE_REQUIRE_INTEGRATION: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Wait for DynamoDB Local
+        run: |
+          for _ in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$AWS_ENDPOINT_URL" || true)
+            if [ "$code" = "400" ]; then echo "DynamoDB Local is up"; exit 0; fi
+            sleep 1
+          done
+          echo "DynamoDB Local did not start" >&2
+          exit 1
+      - name: Build library (default features)
+        run: cargo build -p monotone --locked
+      - name: Build workspace (all features)
+        run: cargo build --workspace --all-features --locked
+      - name: Test library (default features)
+        run: cargo test -p monotone --locked
+      - name: Test workspace (all features, with DynamoDB Local)
+        run: cargo test --workspace --all-features --locked
+
+  msrv:
+    name: Build (MSRV)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Read rust-version
+        id: msrv
+        run: echo "version=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv
+      - name: Resolve dependencies for the MSRV
+        env:
+          CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
+        run: cargo +${{ steps.msrv.outputs.version }} update
+      - name: Build
+        run: cargo +${{ steps.msrv.outputs.version }} build --workspace --all-features --all-targets
+
+  audit:
+    name: Advisories (informational)
+    runs-on: ubuntu-latest
+    # Advisories can exist with no available fix, so this job reports
+    # findings without failing the workflow. Accept an advisory by adding it
+    # to deny.toml with a reason.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+      - name: cargo audit
+        run: cargo audit
+      - name: cargo deny
+        if: always()
+        run: cargo deny check
