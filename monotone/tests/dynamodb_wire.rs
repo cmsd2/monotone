@@ -11,7 +11,6 @@ use std::sync::{Arc, Mutex};
 
 use aws_sdk_dynamodb::Client;
 use aws_sdk_dynamodb::config::{BehaviorVersion, Credentials, Region};
-use aws_smithy_http_client::test_util::infallible_client_fn;
 use monotone::MonotonicCounter;
 use monotone::core::encode::{Attr, Item};
 use monotone::dynamodb::{self, Counter, Error, table};
@@ -26,6 +25,62 @@ struct Recorded {
 
 type Responder = dyn Fn(&str, usize) -> (u16, Value) + Send + Sync;
 
+/// An HTTP client that answers every request by calling a closure.
+///
+/// This replaces `aws_smithy_http_client::test_util::infallible_client_fn`.
+/// That helper sits behind the `test-util` feature, which pulls the
+/// unmaintained `chrono` crate in through `aws-smithy-protocol-test`.
+mod fn_client {
+    use std::fmt;
+    use std::sync::Arc;
+
+    use aws_smithy_runtime_api::client::http::{
+        HttpClient, HttpConnector, HttpConnectorFuture, HttpConnectorSettings, SharedHttpClient,
+        SharedHttpConnector,
+    };
+    use aws_smithy_runtime_api::client::orchestrator::{HttpRequest, HttpResponse};
+    use aws_smithy_runtime_api::client::runtime_components::RuntimeComponents;
+    use aws_smithy_types::body::SdkBody;
+
+    type Handler = dyn Fn(http::Request<SdkBody>) -> http::Response<SdkBody> + Send + Sync;
+
+    #[derive(Clone)]
+    struct FnClient(Arc<Handler>);
+
+    impl fmt::Debug for FnClient {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("FnClient").finish_non_exhaustive()
+        }
+    }
+
+    impl HttpConnector for FnClient {
+        fn call(&self, request: HttpRequest) -> HttpConnectorFuture {
+            let request = request
+                .try_into_http1x()
+                .expect("request converts to http 1.x");
+            let response =
+                HttpResponse::try_from((self.0)(request)).expect("response converts from http 1.x");
+            HttpConnectorFuture::ready(Ok(response))
+        }
+    }
+
+    impl HttpClient for FnClient {
+        fn http_connector(
+            &self,
+            _: &HttpConnectorSettings,
+            _: &RuntimeComponents,
+        ) -> SharedHttpConnector {
+            SharedHttpConnector::new(self.clone())
+        }
+    }
+
+    pub fn new<B: Into<SdkBody>>(
+        f: impl Fn(http::Request<SdkBody>) -> http::Response<B> + Send + Sync + 'static,
+    ) -> SharedHttpClient {
+        SharedHttpClient::new(FnClient(Arc::new(move |req| f(req).map(Into::into))))
+    }
+}
+
 /// A client whose HTTP layer records requests and replies via `respond`,
 /// which receives the operation name and how many times it has been called.
 fn scripted(
@@ -34,7 +89,7 @@ fn scripted(
 ) -> (Client, Arc<Mutex<Vec<Recorded>>>) {
     let log: Arc<Mutex<Vec<Recorded>>> = Arc::default();
     let log2 = log.clone();
-    let http = infallible_client_fn(move |req| {
+    let http = fn_client::new(move |req| {
         let target = req
             .headers()
             .get("x-amz-target")
