@@ -51,7 +51,7 @@
 - [x] 7.1 Update `terraform/` to current provider syntax (`required_providers`, `templatefile` instead of `template_file`), extend the IAM policy to include `DescribeTable`, `CreateTable` and `ListTables`, rename the Travis-specific user, and rewrite `terraform/README.md` to describe it as optional real-AWS test infrastructure; verify `terraform validate` passes
 - [x] 7.2 Rewrite `README.md`: GitHub Actions badge, async usage example, `dynamodb` feature, MSRV, DynamoDB Local instructions with `AWS_ENDPOINT_URL`, CLI examples showing `tags` in output and `--tag`, and a 0.4 to 0.5 migration section; verify every code block compiles or runs as written
 - [x] 7.3 Rewrite `RELEASING.md` for the workspace and tag-driven release (bump both versions, update README, commit, tag `vX.Y.Z`, push tag, watch the release workflow); verify the steps match `release.yml`
-- [ ] 7.4 Close GitHub issue #1 (rusoto migration) with a comment referencing the change once merged; verify the issue is closed
+- [x] 7.4 Close GitHub issue #1 (rusoto migration) with a comment referencing the change once merged; verify the issue is closed
 
 ## 8. Final verification
 
